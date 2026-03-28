@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="initial-scale=1, width=device-width" />
+  <title>Loading...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; color: #fff; font-family: sans-serif; }
+    #loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 12px; }
+    #loader span { font-size: 14px; opacity: 0.6; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="loader">
+  <div class="spinner"></div>
+  <span id="status">Fetching assets…</span>
+</div>
+
+<script>
+(async function () {
+  const BASE = 'https://cdn.jsdelivr.net/gh/fontonwonton/fontonwonton.github.io@main/';
+  const status = document.getElementById('status');
+  function log(msg) { console.log(msg); status.textContent = msg; }
+
+  async function fetchDataURL(url) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const blob = await r.blob();
+      return await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.readAsDataURL(blob);
+      });
+    } catch { return null; }
+  }
+
+  async function fetchText(url) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      return await r.text();
+    } catch { return null; }
+  }
+
+  async function inlineCSS(css, cssBase) {
+    const urlRe = /url\(['"]?([^'")]+)['"]?\)/g;
+    const matches = [...css.matchAll(urlRe)];
+    const replacements = await Promise.all(matches.map(async m => {
+      const raw = m[1];
+      if (raw.startsWith('data:') || raw.startsWith('http') || raw.startsWith('//')) return [m[0], m[0]];
+      try {
+        const abs = new URL(raw, cssBase).href;
+        const du = await fetchDataURL(abs);
+        if (!du) return [m[0], m[0]];
+        return [m[0], `url('${du}')`];
+      } catch { return [m[0], m[0]]; }
+    }));
+    for (const [orig, repl] of replacements) {
+      if (orig !== repl) css = css.split(orig).join(repl);
+    }
+    return css;
+  }
+
+  async function build() {
+    log('Fetching CSS…');
+    // Load all three CSS files the real site uses
+    const [css1Raw, css2Raw, css3Raw] = await Promise.all([
+      fetchText(BASE + 'assets/BuigefS6.css'),
+      fetchText(BASE + 'assets/CKbESb27.css'),
+      fetchText(BASE + 'assets/BNFcjL6o.css'),
+    ]);
+
+    log('Inlining CSS assets…');
+    const [css1, css2, css3] = await Promise.all([
+      css1Raw ? inlineCSS(css1Raw, BASE + 'assets/') : Promise.resolve(''),
+      css2Raw ? inlineCSS(css2Raw, BASE + 'assets/') : Promise.resolve(''),
+      css3Raw ? inlineCSS(css3Raw, BASE + 'assets/') : Promise.resolve(''),
+    ]);
+
+    log('Launching…');
+
+    // Inject CSS
+    const s1 = document.createElement('style'); s1.textContent = css1; document.head.appendChild(s1);
+    const s2 = document.createElement('style'); s2.textContent = css2; document.head.appendChild(s2);
+    const s3 = document.createElement('style'); s3.textContent = css3; document.head.appendChild(s3);
+
+    // URL shim so any new URL(rel, null/undefined) resolves against CDN
+    (function() {
+      const _BASE = BASE;
+      const Native = window.URL;
+      function P(url, base) {
+        if (base == null || base === '' || base === 'null' || base === 'undefined') {
+          try { return new Native(url, _BASE); } catch(e) {}
+          try { return new Native(url); } catch(e) {}
+          throw new TypeError('Failed to construct URL: ' + url);
+        }
+        return new Native(url, base);
+      }
+      P.prototype = Native.prototype;
+      P.createObjectURL = Native.createObjectURL.bind(Native);
+      P.revokeObjectURL = Native.revokeObjectURL.bind(Native);
+      if (Native.canParse) P.canParse = Native.canParse.bind(Native);
+      window.URL = P;
+    })();
+
+    // Replace loader UI
+    document.title = 'v5-static-5.0.42';
+    document.body.innerHTML = '<div id="root"></div>';
+
+    // Importmap
+    const chunks = [
+      'chunks/Home.COV9ZnaQ.js',
+      'chunks/Apps.BKPNwXsB.js',
+      'chunks/Apps2.Vf9IEnZN.js',
+      'chunks/Settings.VPmeMG9-.js',
+      'chunks/Player.Bn6xymlp.js',
+      'chunks/vendor-modules.kyFu_h-i.js',
+      'chunks/localGmLoader.D7XJ6s2_.js',
+      'chunks/Nav.AqMabdpf.js',
+    ];
+    const scramjetCDNUrl = BASE + 'scramjet.all.js';
+    const imports = {};
+    imports['./DGNXy8Zi.js']  = BASE + 'DGNXy8Zi.js';
+    imports['../DGNXy8Zi.js'] = BASE + 'DGNXy8Zi.js';
+    imports['DGNXy8Zi.js']    = BASE + 'DGNXy8Zi.js';
+    for (const form of [
+      './scramjet.all.js', '../scramjet.all.js', 'scramjet.all.js',
+      './eggs/scramjet.all.js', '../eggs/scramjet.all.js', 'eggs/scramjet.all.js',
+      './scramjet/scramjet.all.js', '../scramjet/scramjet.all.js',
+    ]) { imports[form] = scramjetCDNUrl; }
+    for (const c of chunks) {
+      const file = c.split('/').pop();
+      imports['./' + c]        = BASE + c;
+      imports[c]               = BASE + c;
+      imports['./' + file]     = BASE + c;
+      imports['../../' + file] = BASE + c;
+      imports['../' + file]    = BASE + c;
+    }
+
+    const im = document.createElement('script');
+    im.type = 'importmap';
+    im.textContent = JSON.stringify({ imports });
+    document.head.appendChild(im);
+
+    (function() {
+      // Patch fetch: swallow /return?q= proxy autocomplete calls
+      const _fetch = window.fetch;
+      window.fetch = function(input, init) {
+        let url = typeof input === 'string' ? input
+          : (input instanceof Request ? input.url : String(input));
+        if (url.includes('return?q=') || url.includes('/return?')) {
+          return Promise.resolve(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        }
+        return _fetch(input, init);
+      };
+
+      // Service worker stub
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register = function() {
+          return Promise.resolve({ scope: './', active: null, installing: null, waiting: null, addEventListener: function(){} });
+        };
+        navigator.serviceWorker.getRegistrations = function() { return Promise.resolve([]); };
+      }
+
+      // WebSocket — intercept ALL wisp-style connections (wss ending in /) and rotate servers.
+      // The app stores the wisp URL and reuses it directly, so we must catch every wisp WS,
+      // not just baylib.top. We detect wisp by the trailing slash pattern wisp servers use.
+      const _wispServers = [
+        'wss://wisp.mercurywork.shop/',
+        'wss://anura.pro/wisp/',
+        'wss://wisp.anime.black/',
+        'wss://wisp.vh31.net/',
+      ];
+      const NativeWS = window.WebSocket;
+      let _wispIdx = 0;
+      const _isWisp = url => typeof url === 'string' && /^wss?:\/\/.+(\/.*)?\/wisp\/|baylib\.top|mercurywork\.shop|anura\.pro|anime\.black|vh31\.net/.test(url);
+      window.WebSocket = function(url) {
+        const args = Array.from(arguments);
+        if (_isWisp(url)) {
+          const target = _wispServers[_wispIdx % _wispServers.length];
+          args[0] = target;
+          console.log('[wisp] connecting to', target);
+          let ws;
+          try { ws = new (Function.prototype.bind.apply(NativeWS, [null].concat(args))); }
+          catch(e) { _wispIdx++; throw e; }
+          ws.addEventListener('close', function(e) {
+            if (e.code !== 1000) {
+              _wispIdx++;
+              console.warn('[wisp] closed (code=' + e.code + '), next:', _wispServers[_wispIdx % _wispServers.length]);
+            }
+          });
+          return ws;
+        }
+        return new (Function.prototype.bind.apply(NativeWS, [null].concat(args)));
+      };
+      Object.assign(window.WebSocket, { CONNECTING:0, OPEN:1, CLOSING:2, CLOSED:3 });
+      window.WebSocket.prototype = NativeWS.prototype;
+
+      // SharedWorker — Chrome blocks ANY SharedWorker from null origin (file://).
+      // Best we can do: return a cached fake with a real MessageChannel port so
+      // instanceof MessagePort passes, and echo messages so baremux doesn't loop.
+      const _SWW = window.SharedWorker;
+      const _swCache = new Map();
+      window.SharedWorker = function(url) {
+        const isLocal = typeof url === 'string' && (url.startsWith('file:') || url.startsWith('/') || !/^https?:/.test(url));
+        if (isLocal) {
+          if (_swCache.has(url)) return _swCache.get(url);
+          console.warn('[SharedWorker stub]', url);
+          const mc = new MessageChannel();
+          mc.port1.start(); mc.port2.start();
+          mc.port2.postMessage({ type: 'ready' });
+          mc.port2.onmessage = function() { mc.port2.postMessage({ type: 'ok' }); };
+          const fake = { port: mc.port1 };
+          _swCache.set(url, fake);
+          return fake;
+        }
+        try { return new _SWW(...arguments); }
+        catch(e) { const mc = new MessageChannel(); mc.port1.start(); return { port: mc.port1 }; }
+      };
+      if (_SWW) window.SharedWorker.prototype = _SWW.prototype;
+
+      // Stub $scramjetLoadController so oa() init doesn't throw
+      window.$scramjetLoadController = () => ({
+        ScramjetController: class {
+          constructor() {} init() {} setTransport() {} send() {}
+        }
+      });
+      window.scr = true;
+
+      // Redirect scramjet script loads to CDN
+      const scramjetCDN = BASE + 'scramjet.all.js';
+      const _orig = document.createElement.bind(document);
+      document.createElement = function(tag) {
+        const el = _orig(tag);
+        if ((tag || '').toLowerCase() === 'script') {
+          const desc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+          Object.defineProperty(el, 'src', {
+            get() { return desc ? desc.get.call(el) : el.__src__; },
+            set(v) {
+              if (typeof v === 'string' && /scramjet/i.test(v)) v = scramjetCDN;
+              if (desc && desc.set) desc.set.call(el, v); else el.__src__ = v;
+            },
+            configurable: true
+          });
+        }
+        return el;
+      };
+    })();
+
+    // Load main entry from CDN
+    const mod = document.createElement('script');
+    mod.type = 'module';
+    mod.src = BASE + 'DGNXy8Zi.js';
+    document.body.appendChild(mod);
+  }
+
+  try {
+    await build();
+  } catch(err) {
+    log('Error: ' + err.message);
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
